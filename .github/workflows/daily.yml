@@ -2,11 +2,16 @@ name: Daily crypto snapshot
 
 on:
   schedule:
-    - cron: "0 6 * * *"    # runs 06:00 UTC daily
-  workflow_dispatch:       # allows manual "Run workflow" button
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+    inputs:
+      backfill_days:
+        description: "Number of days to backfill (leave 0 for daily snapshot only)"
+        required: false
+        default: "0"
 
 permissions:
-  contents: write          # required so the bot can push commits
+  contents: write
 
 jobs:
   ingest:
@@ -24,7 +29,14 @@ jobs:
           python-version: "3.11"
 
       - name: Pull data (with optional backfill)
-        run: python ingest.py
+        run: |
+          if [ "${{ github.event.inputs.backfill_days }}" != "" ] && [ "${{ github.event.inputs.backfill_days }}" != "0" ]; then
+            echo "Running backfill for ${{ github.event.inputs.backfill_days }} days"
+            python ingest.py --backfill ${{ github.event.inputs.backfill_days }}
+          else
+            echo "Running daily snapshot"
+            python ingest.py
+          fi
 
       - name: Commit and push snapshot
         run: |
