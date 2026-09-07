@@ -1,16 +1,22 @@
 # crypto-monitor
 
-Automated data pipeline that fetches daily cryptocurrency price data 
-and commits snapshots to this repo on a schedule.
+End-to-end crypto data pipeline: automated ingestion → 
+GitHub storage → Power BI dashboard.
 
-## What it does
-- Pulls price data from coingreko every day at 11:00 UTC
-- Saves snapshots to /data as timestamped CSV files
-- Runs via GitHub Actions (see .github/workflows)
+## Pipeline
+1. **Ingest** (`ingest.py`) — pulls daily top-50 crypto 
+   prices from CoinGecko API
+2. **Schedule** (`.github/workflows`) — GitHub Actions 
+   runs it daily, commits new snapshot automatically
+3. **Store** (`/data`) — 100+ days of snapshots in CSV
+4. **Visualize** (`/dashboard`) — Power BI dashboard 
+   reads live from this repo
+
+## Key Findings (100 days: May–Sept 2026)
+- Total market cap grew from $2.46T to $2.69T (+9.2%)
+- BTC ranged $58.6K–$80.9K, a 38% peak-to-trough swing
+- Top 3 coins hold 77.7% of total market cap
+- Biggest gainer: Zcash +130% | Biggest loser: MemeCore -60%
 
 ## Stack
-- Python (requests, pandas)
-- GitHub Actions for scheduling
-- CSV storage
-
-
+Python · GitHub Actions · CoinGecko API · Power BI · DAX
