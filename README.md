@@ -26,4 +26,4 @@ Python, GitHub Actions, CoinGecko API, Chart.js, GitHub Pages, Power BI, DAX.
 
 ## Keeping the Power BI file refreshed
 
-A `.pbix` committed to GitHub is a snapshot; it does not refresh on its own. To make the Power BI version update automatically, publish it to the Power BI Service, point its data source at the raw CSV URL in this repo, and set a scheduled refresh. The steps are in [`POWERBI_REFRESH.md`](POWERBI_REFRESH.md). The web dashboard in `/docs` needs none of this; it is always current.
+A `.pbix` committed to GitHub is a snapshot; it does not refresh on its own. The fix that needs no login: rewire the query to read the raw CSV URL in this repo and turn on "Refresh data when file is opened" in Power BI Desktop, then the file updates itself every time it is opened. Full steps, including the exact query to paste in, are in [`POWERBI_REFRESH.md`](POWERBI_REFRESH.md). The web dashboard in `/docs` needs none of this; it is always current.

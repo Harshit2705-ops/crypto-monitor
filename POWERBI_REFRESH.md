@@ -1,40 +1,53 @@
-# Keeping the Power BI dashboard refreshed automatically
+# Keeping the Power BI file current
 
-A `.pbix` file stored in this repo is a snapshot. GitHub cannot render it, and it does not refresh on its own. The data behind it (`data/crypto_snapshots.csv`) updates every day, but the Power BI file only shows whatever was last published.
+`Crypto Dashboard.pbix` ships with the data baked in, so on its own it is a snapshot from whenever it was last saved. There are two ways to keep it current, and the first one needs no Microsoft or cloud login at all.
 
-There are two ways to close that gap. The web dashboard in `/docs` is already live and needs nothing further. If you also want the Power BI version to stay current, follow the steps below once.
+## Option 1: Auto-refresh on open (no login needed)
 
-## Point Power BI at the live CSV
+This makes the file pull the latest data from GitHub every time it is opened in Power BI Desktop. No Power BI Service account, no work email, nothing to sign into.
 
-The raw, always-current CSV lives at:
+**Step 1: Point the query at the live data**
+
+In Power BI Desktop: Home > Transform data > Power Query Editor. Select the query, open the Advanced Editor, and replace the `Source` step with this:
 
 ```
-https://raw.githubusercontent.com/Harshit2705-ops/crypto-monitor/main/data/crypto_snapshots.csv
+let
+    Source = Csv.Document(
+        Web.Contents("https://raw.githubusercontent.com/Harshit2705-ops/crypto-monitor/main/data/crypto_snapshots.csv"),
+        [Delimiter=",", Columns=8, Encoding=65001, QuoteStyle=QuoteStyle.None]
+    ),
+    PromotedHeaders = Table.PromoteHeaders(Source, [PromoteAllScalars=true]),
+    ChangedTypes = Table.TransformColumnTypes(PromotedHeaders, {
+        {"snapshot_date", type date},
+        {"coin_id", type text},
+        {"symbol", type text},
+        {"name", type text},
+        {"market_cap_rank", Int64.Type},
+        {"price_usd", type number},
+        {"market_cap_usd", type number},
+        {"volume_24h_usd", type number}
+    })
+in
+    ChangedTypes
 ```
 
-In Power BI Desktop:
+Click Close & Apply. The file now reads straight from the CSV in this repo instead of a frozen copy.
 
-1. **Get Data > Web**, and paste the URL above.
-2. Load and shape the data as needed (set `snapshot_date` to a date type, and the price and market cap columns to decimal).
-3. Rebuild or repoint your visuals against this query instead of a local file.
-4. Save and re-publish the `.pbix`.
+**Step 2: Turn on refresh-on-open**
 
-Using the web source instead of a local file is what makes automatic refresh possible.
+File > Options and settings > Options > Current File > Data Load > tick "Refresh data when file is opened" > OK. Save the file.
 
-## Set up scheduled refresh (Power BI Service)
+That is the whole fix. Every time the file is opened, it pulls whatever is in `data/crypto_snapshots.csv` at that moment, and the pipeline updates that file daily. Anyone who downloads the `.pbix` and opens it gets current data automatically, no account required.
 
-1. Sign in to the Power BI Service at app.powerbi.com with your own account.
-2. **Publish** the report from Power BI Desktop to a workspace.
-3. In the Service, open the dataset **Settings**.
-4. Under **Data source credentials**, sign in to the web source (Anonymous is fine for a public CSV).
-5. Under **Scheduled refresh**, turn it on and set a daily time. Pick a time shortly after 06:00 UTC, since that is when the pipeline commits the new snapshot.
+## Option 2: Scheduled cloud refresh (optional, needs a work email)
 
-A public web CSV does not require an on-premises data gateway, so this is all that is needed.
+If a cloud-hosted, shareable version with refresh on a schedule (rather than on open) is wanted, that goes through the Power BI Service at app.powerbi.com. The signup there is built for a Microsoft 365 "work or school" account and generally rejects personal addresses like a Gmail account.
 
-## Optional: a public link
+The common workaround is the Microsoft 365 Developer Program (developer.microsoft.com/microsoft-365/dev-program), which is free and gives a proper `@<something>.onmicrosoft.com` mailbox that Power BI Service accepts, without needing a real employer or a paid Microsoft 365 subscription. With that:
 
-If you want recruiters to open the Power BI report without a login, use **File > Embed report > Publish to web (public)** in the Service. Note that this makes the report publicly visible to anyone with the link, so only use it for non-sensitive data like this.
+1. Publish the file to the Power BI Service.
+2. In the dataset settings, point the source at the same raw CSV URL above.
+3. Turn on scheduled refresh (daily is enough, since the pipeline only updates once a day).
+4. Optionally generate a public embed link to share the report without anyone needing a Power BI account to view it.
 
-## Which version to share
-
-For most people, send the web dashboard link. It opens in any browser, needs no Power BI install, and is always current. Keep the Power BI version for anyone who specifically wants to explore the model in Power BI Desktop.
+This route is entirely optional. Option 1 already solves the "not updating" problem for anyone who opens the file.
