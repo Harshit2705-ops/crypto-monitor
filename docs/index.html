@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Crypto Market Monitor</title>
+<meta name="description" content="A live dashboard reading daily top-50 crypto snapshots straight from the crypto-monitor repository.">
+<script src="./chart.min.js"></script>
+<style>
+  :root {
+    color-scheme: light;
+    --plane:          #f9f9f7;
+    --surface-1:      #fcfcfb;
+    --text-primary:   #0b0b0b;
+    --text-secondary: #52514e;
+    --muted:          #898781;
+    --grid:           #e1e0d9;
+    --baseline:       #c3c2b7;
+    --border:         rgba(11,11,11,0.10);
+    --series-1:       #2a78d6;  /* blue  - market cap */
+    --series-2:       #eb6834;  /* orange - bitcoin  */
+    --good:           #0ca30c;
+    --critical:       #d03b3b;
+    --shadow:         0 1px 2px rgba(11,11,11,0.04), 0 4px 16px rgba(11,11,11,0.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --plane:          #0d0d0d;
+      --surface-1:      #1a1a19;
+      --text-primary:   #ffffff;
+      --text-secondary: #c3c2b7;
+      --muted:          #898781;
+      --grid:           #2c2c2a;
+      --baseline:       #383835;
+      --border:         rgba(255,255,255,0.10);
+      --series-1:       #3987e5;
+      --series-2:       #d95926;
+      --good:           #0ca30c;
+      --critical:       #e66767;
+      --shadow:         0 1px 2px rgba(0,0,0,0.30), 0 4px 16px rgba(0,0,0,0.40);
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --plane:          #0d0d0d;
+    --surface-1:      #1a1a19;
+    --text-primary:   #ffffff;
+    --text-secondary: #c3c2b7;
+    --muted:          #898781;
+    --grid:           #2c2c2a;
+    --baseline:       #383835;
+    --border:         rgba(255,255,255,0.10);
+    --series-1:       #3987e5;
+    --series-2:       #d95926;
+    --good:           #0ca30c;
+    --critical:       #e66767;
+    --shadow:         0 1px 2px rgba(0,0,0,0.30), 0 4px 16px rgba(0,0,0,0.40);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--plane);
+    color: var(--text-primary);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 32px 16px 64px; }
+  header.page { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 8px; }
+  h1 { font-size: 1.6rem; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .sub { color: var(--text-secondary); font-size: 0.95rem; margin: 0; max-width: 60ch; }
+  .live {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-size: 0.8rem; color: var(--text-secondary);
+    background: var(--surface-1); border: 1px solid var(--border);
+    padding: 6px 12px; border-radius: 999px; white-space: nowrap;
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--good); box-shadow: 0 0 0 0 rgba(12,163,12,0.5); animation: pulse 2.4s infinite; }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(12,163,12,0.45); } 70% { box-shadow: 0 0 0 7px rgba(12,163,12,0); } 100% { box-shadow: 0 0 0 0 rgba(12,163,12,0); } }
+  .toggle { cursor: pointer; background: var(--surface-1); border: 1px solid var(--border); color: var(--text-secondary); border-radius: 8px; padding: 6px 10px; font-size: 0.8rem; font-family: inherit; }
+  .toggle:hover { color: var(--text-primary); }
+
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin: 24px 0 8px; }
+  .kpi { background: var(--surface-1); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px; box-shadow: var(--shadow); }
+  .kpi .label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 8px; }
+  .kpi .value { font-size: 1.5rem; font-weight: 650; letter-spacing: -0.01em; }
+  .kpi .meta { font-size: 0.8rem; color: var(--text-secondary); margin-top: 4px; }
+  .up { color: var(--good); } .down { color: var(--critical); }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 18px; }
+  @media (max-width: 780px) { .grid2 { grid-template-columns: 1fr; } }
+  .card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 14px; padding: 18px 18px 14px; box-shadow: var(--shadow); }
+  .card h2 { font-size: 0.98rem; margin: 0 0 2px; }
+  .card .note { font-size: 0.8rem; color: var(--muted); margin: 0 0 14px; }
+  .chartbox { position: relative; height: 260px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--grid); }
+  th { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .sym { color: var(--muted); text-transform: uppercase; font-size: 0.78rem; margin-left: 6px; }
+  .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.8rem; font-variant-numeric: tabular-nums; }
+  .pill.up { background: rgba(12,163,12,0.12); }
+  .pill.down { background: rgba(208,59,59,0.12); }
+
+  footer.page { margin-top: 36px; color: var(--muted); font-size: 0.82rem; text-align: center; }
+  footer.page a { color: var(--text-secondary); }
+  .state { text-align: center; padding: 60px 20px; color: var(--text-secondary); }
+  .spin { width: 28px; height: 28px; border: 3px solid var(--grid); border-top-color: var(--series-1); border-radius: 50%; animation: rot 0.9s linear infinite; margin: 0 auto 16px; }
+  @keyframes rot { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="page">
+    <div>
+      <h1>Crypto Market Monitor</h1>
+      <p class="sub">Top-50 cryptocurrencies by market cap, snapshotted daily by an automated GitHub Actions pipeline. This page reads the same CSV the bot commits, so it always shows the latest data in the repository.</p>
+    </div>
+    <div style="display:flex; gap:10px; align-items:center;">
+      <span class="live"><span class="dot"></span><span id="liveLabel">Loading data…</span></span>
+      <button class="toggle" id="themeBtn" title="Toggle light / dark">Theme</button>
+    </div>
+  </header>
+
+  <div id="loading" class="state"><div class="spin"></div>Fetching the latest snapshot from the repository…</div>
+  <div id="error" class="state" style="display:none;"></div>
+
+  <main id="content" style="display:none;">
+    <section class="kpis" id="kpis"></section>
+
+    <div class="grid2">
+      <div class="card">
+        <h2>Total market capitalisation</h2>
+        <p class="note">Sum of all tracked coins, per day (USD).</p>
+        <div class="chartbox"><canvas id="mcapChart"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>Bitcoin price</h2>
+        <p class="note">Daily close in USD across the tracked window.</p>
+        <div class="chartbox"><canvas id="btcChart"></canvas></div>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <h2>Largest coins today</h2>
+        <p class="note">Top 10 by current market cap (USD).</p>
+        <div class="chartbox"><canvas id="topChart"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>Movers over the window</h2>
+        <p class="note" id="moversNote">Price change from the first to the latest snapshot.</p>
+        <table>
+          <thead><tr><th>Coin</th><th style="text-align:right;">First</th><th style="text-align:right;">Latest</th><th style="text-align:right;">Change</th></tr></thead>
+          <tbody id="moversBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <footer class="page">
+    Built from <a id="repoLink" href="https://github.com/Harshit2705-ops/crypto-monitor">Harshit2705-ops/crypto-monitor</a>.
+    Data source: CoinGecko. No manual updates; the daily pipeline keeps this current.
+  </footer>
+</div>
+
+<script>
+const CSV_URL = "https://raw.githubusercontent.com/Harshit2705-ops/crypto-monitor/main/data/crypto_snapshots.csv";
+
+/* ---------- helpers ---------- */
+const fmtUSD = n => {
+  const a = Math.abs(n);
+  if (a >= 1e12) return "$" + (n/1e12).toFixed(2) + "T";
+  if (a >= 1e9)  return "$" + (n/1e9).toFixed(2) + "B";
+  if (a >= 1e6)  return "$" + (n/1e6).toFixed(2) + "M";
+  if (a >= 1e3)  return "$" + (n/1e3).toFixed(2) + "K";
+  if (a >= 1)    return "$" + n.toFixed(2);
+  return "$" + n.toPrecision(3);
+};
+const fmtPct = n => (n >= 0 ? "+" : "") + n.toFixed(1) + "%";
+const cssVar = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+/* minimal RFC-4180-ish CSV parser (handles quoted fields) */
+function parseCSV(text) {
+  const rows = []; let row = [], field = "", i = 0, inQ = false;
+  while (i < text.length) {
+    const c = text[i];
+    if (inQ) {
+      if (c === '"') { if (text[i+1] === '"') { field += '"'; i++; } else inQ = false; }
+      else field += c;
+    } else {
+      if (c === '"') inQ = true;
+      else if (c === ',') { row.push(field); field = ""; }
+      else if (c === '\n') { row.push(field); rows.push(row); row = []; field = ""; }
+      else if (c === '\r') { /* skip */ }
+      else field += c;
+    }
+    i++;
+  }
+  if (field.length || row.length) { row.push(field); rows.push(row); }
+  return rows;
+}
+
+function showError(msg) {
+  document.getElementById("loading").style.display = "none";
+  const e = document.getElementById("error");
+  e.style.display = "block";
+  e.innerHTML = msg;
+}
+
+/* ---------- load ---------- */
+async function load() {
+  let text;
+  try {
+    const res = await fetch(CSV_URL, { cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    text = await res.text();
+  } catch (err) {
+    showError("Could not load the data file.<br><small>" + err + "</small><br><br>You can view the raw data <a href='" + CSV_URL + "'>here</a>.");
+    return;
+  }
+
+  const rows = parseCSV(text);
+  const header = rows.shift().map(h => h.trim());
+  const idx = Object.fromEntries(header.map((h, k) => [h, k]));
+  const data = rows
+    .filter(r => r.length >= header.length && r[idx.snapshot_date])
+    .map(r => ({
+      date: r[idx.snapshot_date],
+      id: r[idx.coin_id],
+      symbol: r[idx.symbol],
+      name: r[idx.name],
+      price: parseFloat(r[idx.price_usd]),
+      mcap: parseFloat(r[idx.market_cap_usd]),
+    }))
+    .filter(d => d.date && !isNaN(d.price));
+
+  if (!data.length) { showError("The data file loaded but contained no usable rows yet."); return; }
+  render(data);
+}
+
+let charts = [];
+function render(data) {
+  const dates = [...new Set(data.map(d => d.date))].sort();
+  const latest = dates[dates.length - 1];
+  const first = dates[0];
+
+  // total market cap per day
+  const mcapByDay = dates.map(d =>
+    data.filter(x => x.date === d && !isNaN(x.mcap)).reduce((s, x) => s + x.mcap, 0)
+  );
+  const totalLatest = mcapByDay[mcapByDay.length - 1];
+  const totalFirst  = mcapByDay[0];
+  const totalChange = (totalLatest - totalFirst) / totalFirst * 100;
+
+  // BTC series
+  const btc = dates.map(d => {
+    const row = data.find(x => x.date === d && x.id === "bitcoin");
+    return row ? row.price : null;
+  });
+  const btcLatest = [...btc].reverse().find(v => v != null);
+
+  // latest-day coin set
+  const latestRows = data.filter(x => x.date === latest && !isNaN(x.mcap)).sort((a, b) => b.mcap - a.mcap);
+  const coinCount = latestRows.length;
+  const top10 = latestRows.slice(0, 10);
+  const top3Share = latestRows.slice(0, 3).reduce((s, x) => s + x.mcap, 0) / totalLatest * 100;
+
+  // movers: first vs latest price for coins present on the latest day
+  const firstPriceOf = id => { const r = data.find(x => x.id === id && x.price); return r ? { d: r.date, p: r.price } : null; };
+  const movers = latestRows.map(x => {
+    const f = firstPriceOf(x.id);
+    if (!f || f.d === latest) return null;
+    return { name: x.name, symbol: x.symbol, first: f.p, last: x.price, chg: (x.price - f.p) / f.p * 100 };
+  }).filter(Boolean).sort((a, b) => b.chg - a.chg);
+  const gainers = movers.slice(0, 4);
+  const losers  = movers.slice(-4).reverse();
+
+  /* KPIs */
+  const daysSpan = dates.length;
+  document.getElementById("kpis").innerHTML = [
+    `<div class="kpi"><div class="label">Total market cap</div><div class="value">${fmtUSD(totalLatest)}</div><div class="meta ${totalChange>=0?'up':'down'}">${fmtPct(totalChange)} over ${daysSpan} days</div></div>`,
+    `<div class="kpi"><div class="label">Bitcoin</div><div class="value">${fmtUSD(btcLatest)}</div><div class="meta">Latest daily close</div></div>`,
+    `<div class="kpi"><div class="label">Top 3 dominance</div><div class="value">${top3Share.toFixed(1)}%</div><div class="meta">of total market cap</div></div>`,
+    `<div class="kpi"><div class="label">Coins tracked</div><div class="value">${coinCount}</div><div class="meta">by market cap rank</div></div>`,
+    `<div class="kpi"><div class="label">History</div><div class="value">${daysSpan} days</div><div class="meta">${first} to ${latest}</div></div>`,
+  ].join("");
+
+  document.getElementById("liveLabel").textContent = "Updated " + latest;
+  document.getElementById("moversNote").textContent = `Price change from ${first} to ${latest}.`;
+
+  /* movers table */
+  const rowsHtml = g => g.map(m =>
+    `<tr><td>${m.name}<span class="sym">${m.symbol}</span></td>` +
+    `<td class="num">${fmtUSD(m.first)}</td><td class="num">${fmtUSD(m.last)}</td>` +
+    `<td class="num"><span class="pill ${m.chg>=0?'up':'down'}">${fmtPct(m.chg)}</span></td></tr>`
+  ).join("");
+  document.getElementById("moversBody").innerHTML =
+    `<tr><th colspan="4" style="color:var(--good);border-bottom:none;padding-top:10px;">Top gainers</th></tr>` + rowsHtml(gainers) +
+    `<tr><th colspan="4" style="color:var(--critical);border-bottom:none;padding-top:14px;">Top losers</th></tr>` + rowsHtml(losers);
+
+  document.getElementById("loading").style.display = "none";
+  document.getElementById("content").style.display = "block";
+  drawCharts({ dates, mcapByDay, btc, top10 });
+}
+
+function baseOpts() {
+  const ink = cssVar("--text-secondary"), grid = cssVar("--grid"), muted = cssVar("--muted");
+  return {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: "index", intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: cssVar("--surface-1"), titleColor: cssVar("--text-primary"),
+        bodyColor: ink, borderColor: cssVar("--border"), borderWidth: 1, padding: 10,
+        titleFont: { family: "system-ui" }, bodyFont: { family: "system-ui" }, displayColors: true,
+      },
+    },
+    scales: {
+      x: { grid: { display: false }, ticks: { color: muted, maxRotation: 0, autoSkip: true, maxTicksLimit: 6, font: { family: "system-ui", size: 11 } } },
+      y: { grid: { color: grid, drawTicks: false }, border: { display: false }, ticks: { color: muted, font: { family: "system-ui", size: 11 } } },
+    },
+  };
+}
+
+function drawCharts({ dates, mcapByDay, btc, top10 }) {
+  charts.forEach(c => c.destroy()); charts = [];
+  const s1 = cssVar("--series-1"), s2 = cssVar("--series-2");
+
+  // market cap
+  let o = baseOpts();
+  o.scales.y.ticks.callback = v => fmtUSD(v);
+  o.plugins.tooltip.callbacks = { label: ctx => "Market cap: " + fmtUSD(ctx.parsed.y) };
+  charts.push(new Chart(document.getElementById("mcapChart"), {
+    type: "line",
+    data: { labels: dates, datasets: [{ data: mcapByDay, borderColor: s1, backgroundColor: s1 + "22",
+      borderWidth: 2, pointRadius: 0, pointHoverRadius: 5, tension: 0.25, fill: true }] },
+    options: o,
+  }));
+
+  // btc
+  let o2 = baseOpts();
+  o2.scales.y.ticks.callback = v => fmtUSD(v);
+  o2.plugins.tooltip.callbacks = { label: ctx => "BTC: " + fmtUSD(ctx.parsed.y) };
+  charts.push(new Chart(document.getElementById("btcChart"), {
+    type: "line",
+    data: { labels: dates, datasets: [{ data: btc, borderColor: s2, backgroundColor: s2 + "22",
+      borderWidth: 2, pointRadius: 0, pointHoverRadius: 5, tension: 0.25, fill: true, spanGaps: true }] },
+    options: o2,
+  }));
+
+  // top 10 horizontal bar
+  let o3 = baseOpts();
+  o3.indexAxis = "y";
+  o3.scales.x.grid = { color: cssVar("--grid"), drawTicks: false };
+  o3.scales.x.ticks.callback = v => fmtUSD(v);
+  o3.scales.y.grid = { display: false };
+  o3.plugins.tooltip.callbacks = { label: ctx => fmtUSD(ctx.parsed.x) };
+  charts.push(new Chart(document.getElementById("topChart"), {
+    type: "bar",
+    data: { labels: top10.map(c => c.symbol.toUpperCase()), datasets: [{ data: top10.map(c => c.mcap),
+      backgroundColor: s1, borderRadius: 4, borderSkipped: false, barThickness: 14 }] },
+    options: o3,
+  }));
+}
+
+/* theme toggle */
+document.getElementById("themeBtn").addEventListener("click", () => {
+  const cur = document.documentElement.getAttribute("data-theme");
+  const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  const next = cur ? (cur === "dark" ? "light" : "dark") : (dark ? "light" : "dark");
+  document.documentElement.setAttribute("data-theme", next);
+  if (charts.length) { const d = window.__data; if (d) drawCharts(d); }
+});
+// keep chart colors in sync on toggle
+const _draw = drawCharts;
+drawCharts = function(payload){ window.__data = payload; return _draw(payload); };
+
+load();
+</script>
+</body>
+</html>
