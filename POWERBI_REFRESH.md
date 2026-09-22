@@ -1,14 +1,20 @@
 # Keeping the Power BI file current
 
-`Crypto Dashboard.pbix` ships with the data baked in, so on its own it is a snapshot from whenever it was last saved. There are two ways to keep it current, and the first one needs no Microsoft or cloud login at all.
+If you just want to open the dashboard and look at it, start with the section right below. If you're the one maintaining this file, the technical setup is further down.
 
-## Option 1: Auto-refresh on open (no login needed)
+## If you just received this file
 
-This makes the file pull the latest data from GitHub every time it is opened in Power BI Desktop. No Power BI Service account, no work email, nothing to sign into.
+Download `Crypto Dashboard.pbix` from this repo using the download button on the file's page. If you don't already have Power BI Desktop, install it first; it's free, from the Microsoft Store or powerbi.microsoft.com, and no Microsoft or work account is needed just to open a file. Then open the file. It should refresh itself automatically and pull the latest prices, with no sign-in required. If it opens showing old numbers, click Refresh once in the Home ribbon; that always pulls the current data.
 
-**Step 1: Point the query at the live data**
+That covers viewing it. Everything below is for whoever maintains this file, in case the query ever needs fixing again.
 
-In Power BI Desktop: Home > Transform data > Power Query Editor. Select the query, open the Advanced Editor, and replace the `Source` step with this:
+## How the auto-refresh is set up
+
+`Crypto Dashboard.pbix` ships with the data baked in, so on its own it's a snapshot from whenever it was last saved. The fix below makes it pull fresh data from GitHub every time it's opened in Power BI Desktop, no Power BI Service account, no work email, nothing to sign into.
+
+### Step 1: Point the query at the live data
+
+In Power BI Desktop go to Home, then Transform data, then Power Query Editor. Select the query, open the Advanced Editor, and replace the Source step with this:
 
 ```
 let
@@ -33,21 +39,12 @@ in
 
 Click Close & Apply. The file now reads straight from the CSV in this repo instead of a frozen copy.
 
-**Step 2: Turn on refresh-on-open**
+### Step 2: Turn on refresh-on-open
 
-File > Options and settings > Options > Current File > Data Load > tick "Refresh data when file is opened" > OK. Save the file.
+Go to File, then Options and settings, then Options, then Current File, then Data Load, and tick "Refresh data when file is opened," then click OK and save the file.
 
-That is the whole fix. Every time the file is opened, it pulls whatever is in `data/crypto_snapshots.csv` at that moment, and the pipeline updates that file daily. Anyone who downloads the `.pbix` and opens it gets current data automatically, no account required.
+That's the whole fix. Every time the file is opened, it pulls whatever is in `data/crypto_snapshots.csv` at that moment, and the pipeline updates that file daily. Anyone who downloads the `.pbix` and opens it gets current data automatically, no account required.
 
-## Option 2: Scheduled cloud refresh (optional, needs a work email)
+## Optional: a cloud-hosted version with scheduled refresh
 
-If a cloud-hosted, shareable version with refresh on a schedule (rather than on open) is wanted, that goes through the Power BI Service at app.powerbi.com. The signup there is built for a Microsoft 365 "work or school" account and generally rejects personal addresses like a Gmail account.
-
-The common workaround is the Microsoft 365 Developer Program (developer.microsoft.com/microsoft-365/dev-program), which is free and gives a proper `@<something>.onmicrosoft.com` mailbox that Power BI Service accepts, without needing a real employer or a paid Microsoft 365 subscription. With that:
-
-1. Publish the file to the Power BI Service.
-2. In the dataset settings, point the source at the same raw CSV URL above.
-3. Turn on scheduled refresh (daily is enough, since the pipeline only updates once a day).
-4. Optionally generate a public embed link to share the report without anyone needing a Power BI account to view it.
-
-This route is entirely optional. Option 1 already solves the "not updating" problem for anyone who opens the file.
+If a version hosted on the Power BI Service with refresh on a schedule, rather than on open, is ever needed, that requires a Microsoft 365 work or school account. A personal Gmail-type address won't work for signing up there. The free Microsoft 365 Developer Program gives a proper mailbox for this without needing a real employer. From there it's the usual routine: publish, point the dataset at the same CSV URL, and turn on scheduled refresh. Most people opening this file don't need to bother with this.
