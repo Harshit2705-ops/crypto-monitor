@@ -13,7 +13,7 @@ An end-to-end crypto data pipeline that runs itself. It pulls daily prices, stor
    - `/docs` is a web dashboard (HTML and Chart.js) that reads the CSV on every load, so it always reflects the latest snapshot in the repo. This is the live version linked above.
    - A Power BI version is also included for anyone who prefers to open it in Power BI Desktop. It is a static export; see the note below on keeping it refreshed.
 
-## What the data shows (100 days, May to Sept 2026)
+## What the data shows 
 
 - Total market cap moved from $2.46T to $2.69T, up 9.2%.
 - Bitcoin ranged from $58.6K to $80.9K, a 38% swing from peak to trough.
